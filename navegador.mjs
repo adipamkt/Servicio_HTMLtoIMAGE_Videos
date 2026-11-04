@@ -14,6 +14,10 @@
 //   - se puede reusar el navegador entre piezas, que es casi todo el tiempo
 //     de un render en frío.
 //
+// La versión de `puppeteer-core` está fijada a propósito en package.json:
+// tiene que ser la que espera el mismo Chromium que trae `@sparticuz/chromium`
+// (hoy, la 25.11 con Chromium 153). Si una sube sin la otra, el navegador
+// arranca pero falla al hablarle.
 import fs from 'node:fs';
 import os from 'node:os';
 import puppeteer from 'puppeteer-core';
@@ -43,10 +47,13 @@ async function abrir() {
 
   if (EN_VERCEL) {
     const { default: chromium } = await import('@sparticuz/chromium');
+    // Tal como lo documenta el paquete. `headless: "shell"` no es un detalle:
+    // lo que trae empaquetado es el Chrome sin interfaz, y pidiéndole el
+    // modo normal arranca con argumentos que ese binario no entiende.
     navegador = await puppeteer.launch({
-      args: chromium.args,
+      args: await puppeteer.defaultArgs({ args: chromium.args, headless: 'shell' }),
       executablePath: await chromium.executablePath(),
-      headless: true,
+      headless: 'shell',
     });
   } else {
     if (!CHROME_LOCAL) {

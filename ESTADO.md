@@ -93,6 +93,25 @@ saber el número real antes de poner una campaña entera a depender de esto.
 **Lo que no cambia:** las piezas siguen saliendo iguales. El motor es el mismo
 Chrome, solo que empaquetado.
 
+#### Dos cosas que hay que mantener emparejadas
+
+**La versión de `puppeteer-core` está fijada a propósito.** Tiene que esperar
+el mismo Chromium que trae `@sparticuz/chromium`, y no coinciden solas: la
+última de puppeteer pedía Chromium 156 y el paquete de Vercel trae el 153. Si
+una sube sin la otra, el navegador arranca pero falla al hablarle.
+
+```
+@sparticuz/chromium  153   →   puppeteer-core  25.11.0
+```
+
+Para actualizar: mirar qué Chromium trae la versión nueva de uno y buscar la
+del otro que lo espere. Está en `node_modules/puppeteer-core/lib/puppeteer/revisions.js`.
+
+**Y el modo del navegador.** Lo que viene empaquetado es el Chrome sin
+interfaz, no el completo, así que se arranca con `headless: "shell"` y los
+argumentos que arma `puppeteer.defaultArgs`. Pidiéndole el modo normal
+arrancaría con opciones que ese binario no entiende.
+
 ### Lo que falta para enchufarlo
 
 **n8n está en la nube y necesita una dirección pública a la que llamar.** Eso
