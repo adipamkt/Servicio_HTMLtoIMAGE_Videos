@@ -8,16 +8,8 @@
 // necesita esto, y cargar el catálogo le haría leer el export entero del
 // workflow en cada arranque.
 //
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { conPagina } from './navegador.mjs';
-
-// fileURLToPath y no la ruta cruda de la URL: esta carpeta tiene espacios y
-// acentos, que en una URL vienen escritos como %20 y %C3%B1.
-const aqui = p => path.join(path.dirname(fileURLToPath(import.meta.url)), p);
-
-const CONVERTIDOR = aqui('convertidor-svg.js');
+import { aSvg } from './convertidor-svg.mjs';
 
 // Un HTML cualquiera -> su SVG.
 //
@@ -25,9 +17,8 @@ const CONVERTIDOR = aqui('convertidor-svg.js');
 // catálogo de tipos.
 export async function svgDesdeHtml(html, ancho, alto) {
   return conPagina(html, ancho, alto, async pagina => {
-    await pagina.addScriptTag({ content: fs.readFileSync(CONVERTIDOR, 'utf8') });
-    const svg = await pagina.evaluate(
-      (w, h) => window.aSvg(document.body, w, h), ancho, alto);
+    // La función viaja a la página y se ejecuta allá, donde está el dibujo.
+    const svg = await pagina.evaluate(aSvg, ancho, alto);
     return Buffer.from('<?xml version="1.0" encoding="UTF-8"?>\n' + svg, 'utf8');
   });
 }

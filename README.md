@@ -24,7 +24,7 @@ servicio.mjs         la lógica, igual en la máquina y en la nube
 navegador.mjs        el Chrome que dibuja: el de acá o el de Vercel
 render.mjs           HTML -> PNG y WEBP
 editable.mjs         HTML -> SVG
-convertidor-svg.js   corre dentro de la página y la vuelve a emitir como SVG
+convertidor-svg.mjs   corre dentro de la página y la vuelve a emitir como SVG
 almacen.mjs          dónde quedan las piezas: disco acá, Vercel Blob allá
 local.mjs            el servicio en la máquina, para probar
 probar.mjs           la prueba, contra donde esté corriendo

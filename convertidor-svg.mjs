@@ -12,7 +12,15 @@
 // Corre dentro de la página, después de que la plantilla se armó. Reemplaza el
 // documento por el SVG para que `chrome --dump-dom` lo pueda sacar.
 
-window.aSvg = (raiz, ancho, alto) => {
+// Se exporta como función y no como archivo suelto a propósito: así la
+// importa quien la usa, y el empaquetador de Vercel la ve y la incluye. Leída
+// del disco con `readFileSync` no la veía, y el SVG fallaba una vez desplegado
+// aunque anduviera en la máquina.
+//
+// Tiene que ser autónoma —sin nada de afuera— porque viaja a la página como
+// texto: Puppeteer la convierte en string y la ejecuta allá adentro.
+export const aSvg = (ancho, alto) => {
+  const raiz = document.body;
   const base = raiz.getBoundingClientRect();
   const partes = [];
 
