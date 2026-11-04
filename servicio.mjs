@@ -118,6 +118,13 @@ export async function generar(req, res) {
     return json(res, 400, { error: `Medidas fuera de rango: ${ancho}x${alto}.` });
   }
 
+  // Cuánto pesa el HTML que llegó. Va en la respuesta para poder ver el margen
+  // contra el límite de Vercel, que es de 4,5 MB para el cuerpo del pedido y
+  // no se puede subir en ningún plan. Las fotos de docentes viajan adentro del
+  // HTML en base64, así que una campaña con dos fotos grandes se acerca.
+  const kb = Math.round(Buffer.byteLength(html, 'utf8') / 1024);
+  const margen = kb > 3600 ? 'poco margen contra el límite de 4,5 MB de Vercel' : undefined;
+
   const pagina = conTipografias(html, fuentes);
   const id = crypto.randomUUID();
   const t = Date.now();
@@ -135,7 +142,7 @@ export async function generar(req, res) {
 
   const base = process.env.SERVICIO_URL
     || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
-  json(res, 200, { url: `${base}/i/${id}`, ms: Date.now() - t });
+  json(res, 200, { url: `${base}/i/${id}`, ms: Date.now() - t, kb, ...(margen ? { aviso: margen } : {}) });
 }
 
 // Arma el formato pedido a partir del HTML guardado, una sola vez.

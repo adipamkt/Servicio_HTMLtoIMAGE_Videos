@@ -112,6 +112,35 @@ interfaz, no el completo, así que se arranca con `headless: "shell"` y los
 argumentos que arma `puppeteer.defaultArgs`. Pidiéndole el modo normal
 arrancaría con opciones que ese binario no entiende.
 
+#### El límite de 4,5 MB
+
+Vercel no acepta pedidos con el cuerpo más grande que eso, y **no se puede
+subir en ningún plan**. Importa porque las imágenes viajan adentro del HTML en
+base64, así que el pedido pesa lo que pesan las fotos.
+
+Con las imágenes de relleno del catálogo la pieza más grande es el diplomado,
+314 KB. Con fotos reales la cuenta es otra, porque el flujo las achica a estos
+tamaños antes de incrustarlas:
+
+| | Tamaño | Formato |
+|---|---|---|
+| Foto de docente | 400 px | PNG |
+| Foto de docente, diseño 2 | 1000 px | PNG |
+| Foto del director (especialización) | 1100 px | PNG |
+| Fondo | 1400 px | JPEG 80 |
+| Ilustración | 900 px / 1920 px en diplomado | PNG / JPEG 85 |
+| Ilustración vertical | 1300 px | JPEG 85 |
+
+El caso ajustado es el **diseño 2 con dos docentes**: dos PNG recortados de
+1000 px, que en base64 pueden ser un megabyte largo cada uno. Debería entrar,
+pero sin mucho margen.
+
+Por eso la respuesta del servicio ahora trae `kb`, el peso del HTML que llegó.
+Después de dos o tres campañas reales se sabe el margen de verdad en vez de
+estimarlo. Si alguna vez se pasa, el pedido ni siquiera llega al código:
+Vercel responde `413 FUNCTION_PAYLOAD_TOO_LARGE`, y la salida sería achicar
+las fotos en el nodo de n8n o mover el servicio a un host sin ese límite.
+
 ### Lo que falta para enchufarlo
 
 **n8n está en la nube y necesita una dirección pública a la que llamar.** Eso
