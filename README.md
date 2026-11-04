@@ -53,6 +53,40 @@ diferencia es lo que tarda Chrome en arrancar.
 
 Las variables están explicadas una por una en [.env.ejemplo](.env.ejemplo).
 
+## El cambio en n8n
+
+En el nodo **"HTML/CSS to Image"**, un solo campo:
+
+```
+antes   https://hcti.io/v1/image
+ahora   https://serviciohtmltoimagevideos.vercel.app/v1/image
+```
+
+Y en su credencial de autenticación básica, el usuario y la clave que están
+en las variables del proyecto en Vercel.
+
+**El nodo "Descargar imagen" no se toca.** Tampoco el cuerpo del pedido ni
+nada de lo que viene después.
+
+### Para que una pieza salga también en SVG
+
+En el nodo **"Formatos de salida"**, agregar `'svg'` a la lista de formatos de
+esa pieza, al lado de `'png'` y `'webp'`. El servicio lo sirve en la misma
+dirección con la extensión al final, igual que hace con el WEBP.
+
+## Cuánto tarda
+
+Medido con `node probar.mjs` el 4 de noviembre de 2026:
+
+| | En Vercel | En la máquina |
+|---|---|---|
+| Primer render, en frío | 3,9 s | 4,2 s |
+| Los siguientes | 1,8 s | 2,1 s |
+
+Vercel va más rápido que la máquina. El primer render de cada rato es el
+lento, porque hay que arrancar Chrome; después el navegador queda abierto y
+se reusa.
+
 ## Tres cosas que hay que saber
 
 **Las versiones de `puppeteer-core` y `@sparticuz/chromium` van emparejadas.**
