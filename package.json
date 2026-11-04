@@ -1,0 +1,26 @@
+{
+  "name": "adipa-piezas",
+  "version": "1.0.0",
+  "description": "Servicio de render de las piezas de campaña de ADIPA: HTML a imagen y a SVG editable.",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "servidor": "node servidor.mjs",
+    "piezas": "node imagen.mjs",
+    "editable": "node svg.mjs",
+    "video": "node video.mjs"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "@vercel/blob": "^2.8.2",
+    "puppeteer-core": "^25.16.0",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "gsap": "^3.15.0",
+    "hyperframes": "^0.8.208"
+  }
+}

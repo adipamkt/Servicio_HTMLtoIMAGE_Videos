@@ -1,0 +1,10 @@
+# Lo que no tiene que viajar a Vercel.
+#
+# La función solo necesita el motor de render: todo lo demás son herramientas
+# para trabajar en la máquina, y cada megabyte de más es arranque en frío.
+
+salida/
+composicion/vendor/
+origen/workflow-a-piezas.json
+*.md
+.env
