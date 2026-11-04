@@ -3,5 +3,23 @@ salida/
 .env
 .env.*
 !.env.ejemplo
-*-credenciales.json
-.hyperframes/
+.vercel/
+
+# Lo que no es el servicio. Vive en el historial, en el commit 337d7fa:
+# el catálogo de los siete tipos de programa, la gráfica animada en MP4 y
+# los lectores de Monday y del Documento Maestro.
+tipos/
+origen/
+video/
+n8n/
+datos.mjs
+marca.mjs
+paises.mjs
+piezas.mjs
+imagen.mjs
+svg.mjs
+servidor.mjs
+pagina.mjs
+entorno.mjs
+ESTADO.md
+CORRECCION-COLORES.md
