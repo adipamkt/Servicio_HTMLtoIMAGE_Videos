@@ -42,8 +42,27 @@ formatos en ese nodo.
 
 La autenticación es básica, igual que htmlcsstoimage: la credencial que ya
 existe en n8n sirve, solo hay que cambiarle usuario y clave. Se configuran con
-`SERVICIO_USUARIO` y `SERVICIO_CLAVE` en `.env`; sin ellas el servicio queda
-abierto, que sirve para probar en la máquina pero no para dejarlo expuesto.
+`SERVICIO_USUARIO` y `SERVICIO_CLAVE`; sin ellas el servicio queda abierto, que
+sirve para probar en la máquina pero no para dejarlo expuesto.
+
+**La clave protege solo el POST**, que es el que gasta tiempo de máquina. El
+GET de la pieza queda abierto, por dos razones: la dirección lleva un
+identificador al azar de 128 bits que no se adivina —htmlcsstoimage hacía lo
+mismo— y **el nodo de n8n que baja la imagen no manda credenciales**. Si se
+las pidiéramos habría que tocar ese nodo también, y se perdería lo de cambiar
+un solo campo.
+
+### Probar el servicio
+
+```
+node probar.mjs                                    contra la máquina
+node probar.mjs https://la-direccion.vercel.app    contra el desplegado
+node probar.mjs https://la-direccion.vercel.app usuario clave
+```
+
+Hace lo mismo que hace n8n, con una pieza real del catálogo, y mide lo único
+que no se puede saber de antemano: cuánto tarda el primer render en frío
+contra el segundo. En la máquina da 4,1 y 2,1 segundos.
 
 ### Desplegar en Vercel
 

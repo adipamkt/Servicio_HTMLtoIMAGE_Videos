@@ -60,6 +60,16 @@ probadas contra los datos reales. **Hoy no se usan**, porque de eso sigue
 encargándose n8n. Están guardados por si alguna vez se sale de ahí: el trabajo
 difícil, que es entender las reglas, está hecho.
 
+## Probar
+
+```
+node probar.mjs                                    contra la máquina
+node probar.mjs https://la-direccion.vercel.app    contra el desplegado
+```
+
+Hace lo mismo que hace n8n, con una pieza real, y mide cuánto tarda el primer
+render en frío contra el segundo.
+
 ## Para trabajar
 
 Hace falta Node 22 o superior y Google Chrome. FFmpeg solo para el video.

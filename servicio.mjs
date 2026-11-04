@@ -40,6 +40,13 @@ const json = (res, codigo, cuerpo) => {
 // Usuario y clave, si están puestos. htmlcsstoimage usa autenticación básica,
 // así que la credencial que ya existe en n8n sirve tal cual: solo hay que
 // cambiarle el usuario y la clave.
+//
+// **Solo protege el POST**, que es el que gasta: dibujar una pieza cuesta
+// tiempo de máquina. El GET de la pieza queda abierto, igual que en
+// htmlcsstoimage, porque la dirección lleva un identificador al azar de 128
+// bits que no se adivina — y porque el nodo de n8n que baja la imagen no
+// manda credenciales. Si se las pidiéramos, habría que tocar ese nodo también
+// y se perdería lo de cambiar un solo campo.
 export function autorizado(req) {
   const usuario = process.env.SERVICIO_USUARIO;
   const clave = process.env.SERVICIO_CLAVE;
@@ -185,11 +192,13 @@ export async function servir(req, res, archivo) {
 
 // El servicio entero, para que lo monte el servidor de la máquina.
 export async function manejar(req, res, ruta) {
-  if (!autorizado(req)) {
-    res.writeHead(401, { 'www-authenticate': 'Basic realm="piezas"', 'content-type': 'application/json' });
-    return res.end(JSON.stringify({ error: 'Usuario o clave incorrectos.' }));
+  if (req.method === 'POST' && ruta === '/v1/image') {
+    if (!autorizado(req)) {
+      res.writeHead(401, { 'www-authenticate': 'Basic realm="piezas"', 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Usuario o clave incorrectos.' }));
+    }
+    return generar(req, res);
   }
-  if (req.method === 'POST' && ruta === '/v1/image') return generar(req, res);
   if (req.method === 'GET' && ruta.startsWith('/i/')) return servir(req, res, ruta.slice(3));
   return false;
 }
