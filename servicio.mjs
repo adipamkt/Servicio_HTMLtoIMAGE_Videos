@@ -32,6 +32,15 @@ import { guardar, leer, direccion, existe, mimeDe, enVercel } from './almacen.mj
 // guarda para que dos pedidos a la vez no lo hagan dos veces.
 const enCurso = new Map();
 
+// Las medidas viajan adentro del HTML guardado, en la primera línea. Un
+// archivo menos por pieza, que en el plan gratis de Vercel es un tercio de
+// las escrituras.
+const MARCA_MEDIDAS = (ancho, alto) => `<!--medidas:${ancho}x${alto}-->`;
+const leerMedidas = html => {
+  const m = html.match(/^<!--medidas:(\d+)x(\d+)-->/);
+  return m ? { ancho: Number(m[1]), alto: Number(m[2]) } : null;
+};
+
 const json = (res, codigo, cuerpo) => {
   res.writeHead(codigo, { 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(cuerpo, null, 2));
@@ -133,9 +142,10 @@ export async function generar(req, res) {
     const [png] = await capturar(pagina, w, h, ['png'], { espera: Number(espera) || 0 });
     await guardar(id, 'pieza.png', png.bytes);
     // El HTML se guarda para poder armar el WEBP o el SVG después sin que
-    // n8n tenga que mandarlo de nuevo.
-    await guardar(id, 'pieza.html', Buffer.from(pagina, 'utf8'));
-    await guardar(id, 'medidas.json', Buffer.from(JSON.stringify({ ancho: w, alto: h }), 'utf8'));
+    // n8n tenga que mandarlo de nuevo. Las medidas van adentro, en un
+    // comentario, y no en un archivo aparte: el plan gratis de Vercel cuenta
+    // 2000 escrituras al mes, y una por pieza es un tercio del gasto.
+    await guardar(id, 'pieza.html', Buffer.from(`${MARCA_MEDIDAS(w, h)}\n${pagina}`, 'utf8'));
   } catch (e) {
     return json(res, 500, { error: e.message });
   }
@@ -150,14 +160,17 @@ async function armar(id, formato) {
   const llave = `${id}.${formato}`;
   if (!enCurso.has(llave)) {
     enCurso.set(llave, (async () => {
-      const medidas = await leer(id, 'medidas.json');
-      const html = await leer(id, 'pieza.html');
-      if (!medidas || !html) throw new Error('Esa pieza ya no está guardada.');
+      const guardado = await leer(id, 'pieza.html');
+      if (!guardado) throw new Error('Esa pieza ya no está guardada.');
 
-      const { ancho, alto } = JSON.parse(medidas.toString('utf8'));
+      const html = guardado.toString('utf8');
+      const medidas = leerMedidas(html);
+      if (!medidas) throw new Error('El HTML guardado no trae las medidas.');
+
+      const { ancho, alto } = medidas;
       const bytes = formato === 'svg'
-        ? await svgDesdeHtml(html.toString('utf8'), ancho, alto)
-        : (await capturar(html.toString('utf8'), ancho, alto, ['webp']))[0].bytes;
+        ? await svgDesdeHtml(html, ancho, alto)
+        : (await capturar(html, ancho, alto, ['webp']))[0].bytes;
 
       await guardar(id, `pieza.${formato}`, bytes);
       return bytes;
