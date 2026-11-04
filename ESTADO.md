@@ -247,25 +247,35 @@ esquina de la página: si no, aparece una barra morada arriba de todo.
 ## Cómo está armado
 
 ```
-servicio.mjs   el servicio que llama n8n: /v1/image y /i/<id>
-api/           el mismo servicio como funciones de Vercel
-navegador.mjs  el Chrome que dibuja: el de la máquina o el de Vercel
-render.mjs     el motor: HTML → PNG y WEBP
-editable.mjs   el motor: HTML → SVG
-almacen.mjs    dónde quedan las piezas: disco acá, Vercel Blob allá
-piezas.mjs     lo mismo pero sobre el catálogo de tipos
-servidor.mjs   el servidor de la máquina: el servicio más la página de prueba
-pagina.mjs     la página de prueba que sirve en /
-svg.mjs        la versión editable desde la línea de comandos
-video.mjs      el afiche → MP4 con HyperFrames (flujo aparte, más adelante)
-heygen.mjs     la locución y los avatares (API v3)
-monday.mjs     el aviso, los datos del programa y el estado de vuelta
-google.mjs     entrar a Google con una cuenta de servicio
-documento.mjs  lee el Documento Maestro y saca sus etiquetas
-tipos/         el catálogo: un archivo por tipo de pieza
-imagen.mjs     el mismo render desde la línea de comandos
-datos.mjs      lee las plantillas del export de n8n y arma datos de ejemplo
-marca.mjs      colores oficiales + corrección + cálculo de contraste
+EL SERVICIO (lo que se despliega en Vercel)
+  api/               las dos funciones
+  servicio.mjs       la lógica, igual acá y en la nube
+  navegador.mjs      el Chrome que dibuja: el de la máquina o el de Vercel
+  render.mjs         HTML → PNG y WEBP
+  editable.mjs       HTML → SVG
+  convertidor-svg.js corre dentro de la página y la vuelve a emitir como SVG
+  almacen.mjs        dónde quedan las piezas: disco acá, Vercel Blob allá
+
+LAS HERRAMIENTAS DE LA MÁQUINA (no se despliegan)
+  servidor.mjs       el servicio más la página de prueba
+  pagina.mjs         la página que sirve en /
+  imagen.mjs         las piezas desde la línea de comandos
+  svg.mjs            la versión editable desde la línea de comandos
+  piezas.mjs         render sobre el catálogo de tipos
+  tipos/             el catálogo: un archivo por tipo de pieza
+  datos.mjs          lee las plantillas del export de n8n
+  marca.mjs          colores oficiales + corrección + cálculo de contraste
+  paises.mjs         los cuatro países y la hora local de cada uno
+
+EL VIDEO (flujo aparte, más adelante)
+  video/video.mjs    el afiche → MP4 con HyperFrames
+  video/heygen.mjs   la locución y los avatares (API v3)
+  video/composicion/ las animaciones, las ayudas y GSAP
+
+LOS LECTORES DE n8n (guardados, hoy no se usan)
+  n8n/monday.mjs     el aviso, los datos del programa y el estado de vuelta
+  n8n/documento.mjs  lee el Documento Maestro y saca sus etiquetas
+  n8n/google.mjs     entrar a Google con una cuenta de servicio
 guion.mjs      texto de la locución (a medio hacer)
 origen/        el export de n8n y la plantilla extraída
 composicion/   las animaciones, las ayudas, el convertidor a SVG y GSAP

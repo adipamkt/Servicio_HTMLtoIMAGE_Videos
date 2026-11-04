@@ -20,7 +20,7 @@ import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { catalogo } from './tipos/index.mjs';
+import { catalogo } from '../tipos/index.mjs';
 
 const correr = promisify(execFile);
 
@@ -100,8 +100,8 @@ export async function renderizarVideo(nombreTipo, { datos = {}, pieza = null, se
     // ruta con espacios es un problema esperando pasar.
     const t = Date.now();
     await correr(process.execPath,
-      [aqui('node_modules/hyperframes/bin/hyperframes.mjs'), 'render', proyecto, '-o', destino, '--quiet'],
-      { cwd: aqui('.'), maxBuffer: 32 * 1024 * 1024 });
+      [aqui('../node_modules/hyperframes/bin/hyperframes.mjs'), 'render', proyecto, '-o', destino, '--quiet'],
+      { cwd: aqui('..'), maxBuffer: 32 * 1024 * 1024 });
 
     return {
       pieza: elegida.nombre,

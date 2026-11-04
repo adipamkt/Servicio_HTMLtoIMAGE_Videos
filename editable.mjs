@@ -17,7 +17,7 @@ import { conPagina } from './navegador.mjs';
 // acentos, que en una URL vienen escritos como %20 y %C3%B1.
 const aqui = p => path.join(path.dirname(fileURLToPath(import.meta.url)), p);
 
-const CONVERTIDOR = aqui('composicion/a-svg.js');
+const CONVERTIDOR = aqui('convertidor-svg.js');
 
 // Un HTML cualquiera -> su SVG.
 //

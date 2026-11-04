@@ -18,7 +18,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { renderizar } from './piezas.mjs';
-import { renderizarVideo } from './video.mjs';
+import { renderizarVideo } from './video/video.mjs';
 import { renderizarSvg } from './piezas.mjs';
 import { manejar as servicioRender, esRutaDelServicio } from './servicio.mjs';
 import { listar } from './tipos/index.mjs';

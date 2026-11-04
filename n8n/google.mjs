@@ -14,7 +14,7 @@
 //
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { credencial } from './entorno.mjs';
+import { credencial } from '../entorno.mjs';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 

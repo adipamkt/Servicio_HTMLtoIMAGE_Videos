@@ -25,7 +25,7 @@ const aqui = p => path.join(path.dirname(fileURLToPath(import.meta.url)), p);
 
 // El .env se lee a mano: una dependencia menos para una cosa de seis líneas.
 function clave() {
-  const archivo = aqui('.env');
+  const archivo = aqui('../.env');
   if (!fs.existsSync(archivo)) {
     throw new Error('Falta el archivo .env. Copiá .env.ejemplo y completá HEYGEN_API_KEY.');
   }

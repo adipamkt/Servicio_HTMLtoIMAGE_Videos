@@ -11,7 +11,7 @@
     "servidor": "node servidor.mjs",
     "piezas": "node imagen.mjs",
     "editable": "node svg.mjs",
-    "video": "node video.mjs"
+    "video": "node video/video.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",

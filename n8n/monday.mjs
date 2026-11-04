@@ -10,7 +10,7 @@
 // Las columnas tienen nombres de máquina (`lookup_mm6471ev`) porque así las
 // nombra Monday. Están todas acá arriba para no salir a buscarlas.
 
-import { credencial } from './entorno.mjs';
+import { credencial } from '../entorno.mjs';
 
 const API = 'https://api.monday.com/v2';
 

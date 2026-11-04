@@ -1,10 +1,30 @@
 # Lo que no tiene que viajar a Vercel.
 #
-# La función solo necesita el motor de render: todo lo demás son herramientas
+# La función solo necesita el motor de render. Todo lo demás son herramientas
 # para trabajar en la máquina, y cada megabyte de más es arranque en frío.
+#
+# Lo que sí viaja: api/, servicio.mjs, render.mjs, editable.mjs,
+# navegador.mjs, almacen.mjs y convertidor-svg.js.
 
 salida/
-composicion/vendor/
-origen/workflow-a-piezas.json
+video/
+n8n/
+
+# El catálogo de tipos y el export de n8n: 2 MB de plantillas que el servicio
+# no usa, porque n8n le manda el HTML ya armado.
+tipos/
+origen/
+datos.mjs
+marca.mjs
+paises.mjs
+piezas.mjs
+
+# Las herramientas de la máquina.
+servidor.mjs
+pagina.mjs
+imagen.mjs
+svg.mjs
+entorno.mjs
+
 *.md
 .env
