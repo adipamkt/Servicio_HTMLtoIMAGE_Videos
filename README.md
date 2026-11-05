@@ -87,6 +87,16 @@ Vercel va más rápido que la máquina. El primer render de cada rato es el
 lento, porque hay que arrancar Chrome; después el navegador queda abierto y
 se reusa.
 
+## El SVG necesita Poppins instalada
+
+El SVG guarda el texto como texto, no como dibujo: por eso se puede corregir
+una tilde en Illustrator. Pero entonces la tipografía la pone la máquina que
+lo abre. **Sin Poppins instalada el texto se ve con otra letra y los renglones
+quedan corridos.** El PNG no tiene ese problema porque ahí la letra ya está
+dibujada.
+
+Las fotos sí van adentro del archivo, en base64: el SVG se abre sin internet.
+
 ## Tres cosas que hay que saber
 
 **Las versiones de `puppeteer-core` y `@sparticuz/chromium` van emparejadas.**

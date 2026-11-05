@@ -152,7 +152,18 @@ export async function generar(req, res) {
 
   const base = process.env.SERVICIO_URL
     || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
-  json(res, 200, { url: `${base}/i/${id}`, ms: Date.now() - t, kb, ...(margen ? { aviso: margen } : {}) });
+  const url = `${base}/i/${id}`;
+
+  // `url` sola es lo que devolvía htmlcsstoimage y es de lo que depende el
+  // flujo. Las otras van al lado solo para que se vean: el WEBP y el SVG se
+  // arman recién cuando alguien los pide.
+  json(res, 200, {
+    url,
+    formatos: { png: url, webp: `${url}.webp`, svg: `${url}.svg` },
+    ms: Date.now() - t,
+    kb,
+    ...(margen ? { aviso: margen } : {}),
+  });
 }
 
 // Arma el formato pedido a partir del HTML guardado, una sola vez.

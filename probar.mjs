@@ -19,6 +19,11 @@ const auth = usuario
 
 // Una pieza con lo que tienen las de verdad: tipografía de Google, texto que
 // se ajusta, bloques de color con esquinas redondeadas y una imagen.
+//
+// Lleva además las cuatro cosas que el SVG se comía sin avisar: el fondo
+// degradado, los títulos en mayúscula, las formas recortadas con clip-path y
+// las fotos desvanecidas con mask-image. El PNG salía bien igual, así que la
+// única manera de darse cuenta era abrir el SVG y mirarlo.
 const PIEZA = `<!doctype html>
 <html lang="es">
 <head>
@@ -27,12 +32,23 @@ const PIEZA = `<!doctype html>
 <style>
   * { margin: 0; box-sizing: border-box; }
   html, body { width: 1080px; height: 1920px; overflow: hidden; }
-  body { font-family: Poppins, Helvetica, sans-serif; background: #FFFFFF; color: #091E42; position: relative; }
+  body { font-family: Poppins, Helvetica, sans-serif; color: #091E42; position: relative;
+         background: linear-gradient(180deg, #9C83FC 0%, #E1D8FF 40%, #D3C7FE 100%); }
   .mancha { position: absolute; right: -180px; top: -120px; width: 760px; height: 760px;
             border-radius: 50%; background: #F3F4FF; }
   .pildora { position: absolute; left: 62px; top: 280px; height: 84px; padding: 0 34px;
              border-radius: 42px; background: #704EFD; color: #fff; font-weight: 700;
-             font-size: 44px; line-height: 86px; }
+             font-size: 44px; line-height: 86px; text-transform: uppercase; }
+  .marco { position: absolute; left: 480px; top: 760px; width: 300px; height: 300px;
+           border-radius: 40px; overflow: hidden; }
+  .marco img { position: static; width: 640px; height: 300px; border-radius: 0; }
+  .fade { position: absolute; right: 62px; top: 760px; width: 240px; height: 300px;
+          background: #704EFD;
+          -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 30%, transparent 100%); }
+  .forma { position: absolute; left: 0; top: 1600px; width: 1080px; height: 320px;
+           background: #091E42;
+           clip-path: path('M0 0 L1080 0 L1080 320 L0 320 Z M0 0 Q540 170 1080 0 Z'); }
   .titulo { position: absolute; left: 62px; top: 410px; width: 900px; font-size: 76px;
             font-weight: 700; line-height: 1.12; }
   .bloque { position: absolute; left: 62px; top: 1080px; width: 956px; height: 420px;
@@ -49,8 +65,11 @@ const PIEZA = `<!doctype html>
   <div class="pildora">Prueba del servicio</div>
   <div class="titulo">Intervención en crisis: herramientas para el abordaje inicial del riesgo suicida</div>
   <img src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><circle cx="110" cy="110" r="110" fill="#DFD5FF"/></svg>').toString('base64')}" alt="">
+  <div class="marco"><img src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300"><rect width="640" height="300" fill="#1B6EF3"/></svg>').toString('base64')}" alt=""></div>
+  <div class="fade"></div>
   <div class="bloque"></div>
   <div class="cta">¡Cupos limitados! Inscríbete ahora</div>
+  <div class="forma"></div>
 </body>
 </html>`;
 
@@ -103,15 +122,37 @@ if (res.status !== 200) {
 comprobar('devuelve una dirección', !!cuerpo?.url, cuerpo?.url || '');
 
 // --- 3. Los tres formatos ------------------------------------------------------
+let svg = '';
 for (const [ext, mime] of Object.entries({ '': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml' })) {
   const t = Date.now();
   const r = await fetch(cuerpo.url + ext);
-  const bytes = (await r.arrayBuffer()).byteLength;
+  const datos = await r.arrayBuffer();
+  const bytes = datos.byteLength;
+  if (ext === '.svg') svg = Buffer.from(datos).toString('utf8');
   comprobar(
     `${(ext || '.png').padEnd(5)} se sirve`,
     r.status === 200 && (r.headers.get('content-type') || '').startsWith(mime) && bytes > 1000,
     `HTTP ${r.status}  ${(bytes / 1024).toFixed(0)} KB  ${Date.now() - t} ms`);
 }
+
+// --- 3b. Que el SVG traiga el diseño, no solo la mitad -------------------------
+//
+// Un SVG que pesa y se sirve puede estar igual vacío de lo que importa: sin el
+// fondo, con los títulos en minúscula o con las formas convertidas en
+// rectángulos. Eso ya pasó una vez y el PNG no lo delataba.
+for (const [que, ok] of Object.entries({
+  'el fondo degradado': /<linearGradient[^>]*>[\s\S]*?<stop/.test(svg),
+  'los títulos en mayúscula': svg.includes('PRUEBA DEL SERVICIO'),
+  'las formas recortadas': /<clipPath[^>]*>\s*<path/.test(svg),
+  'el desvanecido de la foto': /<mask\b/.test(svg),
+  'la foto recortada por su marco': /<clipPath[^>]*>\s*<rect/.test(svg),
+  // La foto suelta mide 220 y es redonda: su recorte tiene que dar 110 de
+  // radio, no los 50 que diría leer "50%" como si fueran píxeles.
+  'la foto redonda redonda': /<clipPath[^>]*>\s*<rect[^>]*rx="110"/.test(svg),
+  'la mancha del fondo redonda': /rx="380"/.test(svg),
+  'las fotos incrustadas': !/href="https?:/.test(svg),
+  'el texto como texto': (svg.match(/<text\b/g) || []).length >= 4,
+})) comprobar(`el SVG trae ${que}`, ok);
 
 // --- 4. El segundo render, con el servicio ya caliente -------------------------
 const t1 = Date.now();
