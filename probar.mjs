@@ -58,6 +58,16 @@ const PIEZA = `<!doctype html>
      dentro de un atributo rompe el XML si no se escapa. */
   .serif { position: absolute; left: 62px; top: 1360px; font-family: "Times New Roman", serif;
            font-size: 30px; color: #091E42; }
+  /* Un icono dibujado a mano: el color va en el <svg> de afuera y lo heredan
+     las formas de adentro. */
+  .icono { position: absolute; left: 620px; top: 1360px; width: 68px; height: 68px; }
+  /* Esquinas distintas: <rect> no sabe de esto, hace falta un camino. */
+  .tarjeta { position: absolute; left: 0; top: 1440px; width: 620px; height: 120px;
+             background: #fff; border-radius: 0 95px 95px 0; }
+  /* El velo blanco que aclara la mitad de abajo, puesto desde el CSS. */
+  .velo { position: absolute; inset: 0; }
+  .velo::after { content: ""; position: absolute; inset: 0;
+                 background: linear-gradient(to bottom, rgba(255,255,255,0) 60%, #fff 100%); }
   .forma { position: absolute; left: 0; top: 1600px; width: 1080px; height: 320px;
            background: #091E42;
            clip-path: path('M0 0 L1080 0 L1080 320 L0 320 Z M0 0 Q540 170 1080 0 Z'); }
@@ -81,6 +91,9 @@ const PIEZA = `<!doctype html>
   <div class="fade"></div>
   <div class="docente">PhD. Mg. Ps. John Sommers-Flanagan</div>
   <div class="serif">Nombre con tipografía de dos palabras</div>
+  <svg class="icono" viewBox="0 0 68 68" fill="none" stroke="#704EF9" stroke-width="3"><rect x="3" y="9" width="62" height="54" rx="4"/><line x1="3" y1="21" x2="65" y2="21"/></svg>
+  <div class="tarjeta"></div>
+  <div class="velo"></div>
   <img class="gris" src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#E0452B"/></svg>').toString('base64')}" alt="">
   <img class="contorno" src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#1B6EF3"/></svg>').toString('base64')}" alt="">
   <div class="bloque"></div>
@@ -180,6 +193,15 @@ for (const [que, ok] of Object.entries({
   // roto no lo abre nadie.
   'la tipografía de dos palabras escapada':
     svg.includes('&quot;Times New Roman&quot;') && !svg.includes('=""Times'),
+  // El color de los iconos viene del <svg> de afuera: si no se copia, las
+  // formas salen como cuadrados negros.
+  'los iconos con su color': /<rect[^>]*stroke="rgb\(112, 78, 249\)"/.test(svg),
+  // Esquinas distintas: tiene que salir un camino, no un rectángulo. El radio
+  // sale 60 y no 95 porque la tarjeta mide 120 de alto y CSS los achica para
+  // que entren, igual que hace el navegador.
+  'la tarjeta de esquinas distintas': /<path d="M0 1440H560A60 60 /.test(svg),
+  // El velo del CSS, que no existe como etiqueta en la página.
+  'el velo de los pseudo-elementos': (svg.match(/<linearGradient\b/g) || []).length >= 3,
 })) comprobar(`el SVG trae ${que}`, ok);
 
 // --- 4. El segundo render, con el servicio ya caliente -------------------------

@@ -42,26 +42,71 @@ export const aSvg = (ancho, alto) => {
 
   const rel = r => ({ x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height });
 
-  // El radio de las esquinas, acotado para que no se pase del bloque.
+  // Los radios de las cuatro esquinas, cada una con su eje x y su eje y.
   //
-  // Puede venir en porcentaje: `border-radius: 50%` es el círculo que la
-  // plantilla usa para las manchas de fondo y para las fotos redondas, y mide
-  // la mitad del bloque, no 50 píxeles. Van los dos ejes por separado porque
-  // con un bloque que no es cuadrado el círculo es una elipse.
-  const radioDe = (estilo, r) => {
-    const v = String(estilo.borderTopLeftRadius || '0').trim().split(/\s+/);
+  // Las cuatro por separado porque rara vez son iguales: la tarjeta de los
+  // datos del curso es `border-radius: 0 95px 95px 0`, redonda de un lado y
+  // recta del otro. Leer solo una esquina y repetirla dejaba la tarjeta
+  // cuadrada.
+  //
+  // Pueden venir en porcentaje: `50%` es el círculo de las manchas de fondo y
+  // de las fotos redondas, y mide la mitad del bloque, no 50 píxeles.
+  const ESQUINAS = [
+    ['ai', 'borderTopLeftRadius'], ['ad', 'borderTopRightRadius'],
+    ['bd', 'borderBottomRightRadius'], ['bi', 'borderBottomLeftRadius'],
+  ];
+  const radiosDe = (estilo, r) => {
     const eje = (txt, total) => txt.endsWith('%')
       ? (parseFloat(txt) || 0) * total / 100
       : (parseFloat(txt) || 0);
-    return {
-      rx: Math.min(eje(v[0], r.w), r.w / 2),
-      ry: Math.min(eje(v[1] || v[0], r.h), r.h / 2),
-    };
+    const e = {};
+    for (const [clave, prop] of ESQUINAS) {
+      const v = String(estilo[prop] || '0').trim().split(/\s+/);
+      e[clave] = [eje(v[0], r.w), eje(v[1] || v[0], r.h)];
+    }
+    // Si en algún lado los dos radios no entran, CSS los achica todos por
+    // igual hasta que entren.
+    const cabe = (largo, a, b) => (a + b > 0 ? largo / (a + b) : Infinity);
+    const f = Math.min(1,
+      cabe(r.w, e.ai[0], e.ad[0]), cabe(r.w, e.bi[0], e.bd[0]),
+      cabe(r.h, e.ai[1], e.bi[1]), cabe(r.h, e.ad[1], e.bd[1]));
+    if (f < 1) for (const [clave] of ESQUINAS) e[clave] = [e[clave][0] * f, e[clave][1] * f];
+    return e;
   };
 
-  // Los atributos de las esquinas de un <rect>, o nada si es recto.
-  const esquinasDe = (rx, ry) =>
-    rx > 0 || ry > 0 ? `rx="${n(rx)}" ry="${n(ry)}" ` : '';
+  const sinEsquinas = e => ESQUINAS.every(([c]) => e[c][0] === 0 && e[c][1] === 0);
+  const esquinasIguales = e => ESQUINAS.every(([c]) =>
+    e[c][0] === e.ai[0] && e[c][1] === e.ai[1]);
+
+  // El contorno de un bloque con esquinas distintas, como camino.
+  const caminoDe = (r, e) => {
+    const { x, y, w, h } = { x: r.x, y: r.y, w: r.w, h: r.h };
+    const arco = ([rx, ry], X, Y) =>
+      rx > 0 || ry > 0 ? `A${n(rx)} ${n(ry)} 0 0 1 ${n(X)} ${n(Y)}` : '';
+    return `M${n(x + e.ai[0])} ${n(y)}`
+      + `H${n(x + w - e.ad[0])}` + arco(e.ad, x + w, y + e.ad[1])
+      + `V${n(y + h - e.bd[1])}` + arco(e.bd, x + w - e.bd[0], y + h)
+      + `H${n(x + e.bi[0])}` + arco(e.bi, x, y + h - e.bi[1])
+      + `V${n(y + e.ai[1])}` + arco(e.ai, x + e.ai[0], y)
+      + 'Z';
+  };
+
+  // La forma de un bloque: un <rect> mientras se pueda, y un <path> cuando
+  // las esquinas no son todas iguales, porque <rect> no sabe de eso.
+  const forma = (r, e, atributos) => {
+    if (!esquinasIguales(e)) return `<path d="${caminoDe(r, e)}" ${atributos}/>`;
+    const [rx, ry] = e.ai;
+    return `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" `
+      + (rx > 0 || ry > 0 ? `rx="${n(rx)}" ry="${n(ry)}" ` : '') + `${atributos}/>`;
+  };
+
+  // El mismo bloque metido hacia adentro, para apoyar el trazo del borde en
+  // el medio de su grosor.
+  const encogida = (r, e, g) => {
+    const dentro = {};
+    for (const [c] of ESQUINAS) dentro[c] = [Math.max(0, e[c][0] - g / 2), Math.max(0, e[c][1] - g / 2)];
+    return [{ x: r.x + g / 2, y: r.y + g / 2, w: Math.max(0, r.w - g), h: Math.max(0, r.h - g) }, dentro];
+  };
 
   // --- Leer valores de CSS ----------------------------------------------------
   //
@@ -223,6 +268,63 @@ export const aSvg = (ancho, alto) => {
     return id;
   };
 
+  // --- Los <svg> que ya trae la plantilla -------------------------------------
+  //
+  // Se copian tal cual, pero el color hay que volver a escribirlo: en la
+  // página puede venir de un atributo del <svg> de afuera o de una regla de
+  // CSS, y al sacar el dibujo de su página se queda sin las dos cosas.
+
+  // Lo que se hereda de padre a hijo y define cómo se pinta una forma.
+  const PINTURA = ['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width',
+    'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset',
+    'stroke-opacity', 'stroke-miterlimit'];
+  const LETRA = ['font-family', 'font-size', 'font-weight', 'font-style',
+    'letter-spacing', 'text-anchor', 'dominant-baseline'];
+
+  // Los atributos de la raíz del dibujo, menos los que acá se recalculan.
+  const atributosHeredados = el => {
+    let salida = '';
+    for (const a of el.attributes) {
+      if (['x', 'y', 'width', 'height', 'id', 'class', 'style'].includes(a.name)) continue;
+      salida += ` ${a.name}="${esc(a.value)}"`;
+    }
+    return salida;
+  };
+
+  // El contenido del dibujo, con el color de cada forma escrito encima.
+  const conPinturaPropia = el => {
+    const copia = el.cloneNode(true);
+    const origen = [el, ...el.querySelectorAll('*')];
+    const destino = [copia, ...copia.querySelectorAll('*')];
+
+    origen.forEach((o, i) => {
+      const d = destino[i];
+      if (!d) return;
+      const c = getComputedStyle(o);
+
+      // Se escriben siempre, incluso cuando valen lo de por defecto: como el
+      // padre puede estar diciendo otra cosa, callarse no es lo mismo que
+      // repetir el valor.
+      for (const p of PINTURA) {
+        const v = c.getPropertyValue(p);
+        if (v) d.setAttribute(p, v.replace(/px$/, ''));
+      }
+      if (/^(text|tspan)$/i.test(o.tagName)) {
+        for (const p of LETRA) {
+          const v = c.getPropertyValue(p);
+          if (v && v !== 'normal') d.setAttribute(p, v.replace(/px$/, ''));
+        }
+      }
+      const op = c.getPropertyValue('opacity');
+      if (op && Number(op) < 1) d.setAttribute('opacity', op);
+
+      // Las clases y los estilos ya no apuntan a nada fuera de la página.
+      d.removeAttribute('class');
+      d.removeAttribute('style');
+    });
+    return copia.innerHTML;
+  };
+
   // --- Texto ------------------------------------------------------------------
   //
   // Las medidas de la tipografía, para apoyar el texto en su línea de base.
@@ -314,15 +416,13 @@ export const aSvg = (ancho, alto) => {
   };
 
   // --- El fondo de un bloque --------------------------------------------------
-  const fondo = (el, estilo, r, salida) => {
+  const fondo = (estilo, r, salida) => {
     if (!(r.w > 0 && r.h > 0)) return;
-    const { rx, ry } = radioDe(estilo, r);
-    const esquinas = esquinasDe(rx, ry);
+    const e = radiosDe(estilo, r);
 
     // El color, si pinta.
     if (pinta(estilo.backgroundColor)) {
-      salida.push(`<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" `
-        + `${esquinas}fill="${estilo.backgroundColor}"/>`);
+      salida.push(forma(r, e, `fill="${estilo.backgroundColor}"`));
     }
 
     // El degradado, encima del color. Es lo que pinta el fondo de casi todas
@@ -331,8 +431,7 @@ export const aSvg = (ancho, alto) => {
     if (img && img !== 'none') {
       const g = degradado(img, r);
       if (g) {
-        salida.push(`<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" `
-          + `${esquinas}fill="${g.pintura}"/>`);
+        salida.push(forma(r, e, `fill="${g.pintura}"`));
       } else {
         // Una foto puesta como fondo: se incrusta igual que un <img>.
         const u = img.match(/^url\(["']?([^"')]+)["']?\)$/);
@@ -370,11 +469,8 @@ export const aSvg = (ancho, alto) => {
 
     if (todosIguales) {
       const g = lados[0].grosor;
-      salida.push(
-        `<rect x="${n(r.x + g / 2)}" y="${n(r.y + g / 2)}" `
-        + `width="${n(Math.max(0, r.w - g))}" height="${n(Math.max(0, r.h - g))}" `
-        + esquinasDe(Math.max(0, rx - g / 2), Math.max(0, ry - g / 2))
-        + `fill="none" stroke="${lados[0].color}" stroke-width="${n(g)}"/>`);
+      salida.push(forma(...encogida(r, e, g),
+        `fill="none" stroke="${lados[0].color}" stroke-width="${n(g)}"`));
       return;
     }
 
@@ -478,6 +574,52 @@ export const aSvg = (ancho, alto) => {
     return id;
   };
 
+  // --- Los pseudo-elementos ---------------------------------------------------
+  //
+  // `::before` y `::after` pintan igual que cualquier bloque, pero no están en
+  // el documento: no se les puede preguntar dónde quedaron. Hay que armarles
+  // la caja con las medidas que el navegador ya resolvió, apoyándose en la
+  // caja del bloque al que pertenecen.
+  //
+  // Las piezas los usan para el velo blanco que aclara la mitad de abajo del
+  // afiche. Sin esto, el fondo volvía a aparecer donde no debía.
+  const pseudo = (el, estiloPadre, r, cual, salida) => {
+    const s = getComputedStyle(el, cual);
+    if (!s.content || s.content === 'none' || s.content === 'normal') return;
+    if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return;
+
+    // Solo los colocados, y solo cuando su bloque es el que los coloca: de
+    // los que van en el flujo del texto no se puede saber dónde cayeron sin
+    // volver a maquetar la página.
+    if (s.position !== 'absolute' && s.position !== 'fixed') return;
+    if (estiloPadre.position === 'static') return;
+
+    const num = v => parseFloat(v) || 0;
+    const w = num(s.width), h = num(s.height);
+    if (!(w > 0 && h > 0)) return;
+
+    const caja = {
+      x: s.left !== 'auto' ? r.x + num(s.left) : r.x + r.w - num(s.right) - w,
+      y: s.top !== 'auto' ? r.y + num(s.top) : r.y + r.h - num(s.bottom) - h,
+      w, h,
+    };
+
+    const dentro = [];
+    fondo(s, caja, dentro);
+    if (!dentro.length) return;
+
+    const envoltura = [];
+    const idFiltro = filtro(s);
+    if (idFiltro) envoltura.push(`filter="url(#${idFiltro})"`);
+    const idMascara = desvanecido(s, caja);
+    if (idMascara) envoltura.push(`mask="url(#${idMascara})"`);
+    if (s.mixBlendMode && s.mixBlendMode !== 'normal') envoltura.push(`style="mix-blend-mode:${s.mixBlendMode}"`);
+    if (Number(s.opacity) < 1) envoltura.push(`opacity="${s.opacity}"`);
+
+    if (envoltura.length) salida.push(`<g ${envoltura.join(' ')}>`, ...dentro, '</g>');
+    else salida.push(...dentro);
+  };
+
   // --- Recorrido --------------------------------------------------------------
   //
   // Devuelve lo que dibuja el elemento y todo lo que tiene adentro.
@@ -493,10 +635,16 @@ export const aSvg = (ancho, alto) => {
 
     if (tag === 'svg') {
       // Un <svg> del afiche se copia entero: ya es vectorial.
-      const vb = el.getAttribute('viewBox');
+      //
+      // Pero no alcanza con copiar lo de adentro. Los iconos llevan el color
+      // en el <svg> de afuera —`fill="none" stroke="#704EF9"`— o en una regla
+      // de CSS, y nada de eso viaja con el contenido: los calendarios y los
+      // relojes salían como cuadrados negros, que es el color por defecto.
+      // Así que a cada forma se le escribe encima el color que el navegador
+      // dice que tiene.
       salida.push(
         `<svg x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}"`
-        + `${vb ? ` viewBox="${vb}"` : ''}>${el.innerHTML}</svg>`);
+        + atributosHeredados(el) + `>${conPinturaPropia(el)}</svg>`);
     } else if (tag === 'img') {
       // Una imagen se incrusta tal cual: una foto no se puede vectorizar.
       const src = el.currentSrc || el.src;
@@ -523,13 +671,19 @@ export const aSvg = (ancho, alto) => {
       // varios renglones, y cada uno tiene su propio recuadro. Pintar la caja
       // que los abarca a todos taparía el hueco del final de cada renglón.
       const cajas = el.getClientRects();
-      if (cajas.length > 1) for (const c of cajas) fondo(el, estilo, rel(c), salida);
-      else fondo(el, estilo, r, salida);
+      if (cajas.length > 1) for (const c of cajas) fondo(estilo, rel(c), salida);
+      else fondo(estilo, r, salida);
+
+      // El ::before se pinta antes de lo que el bloque tiene adentro.
+      pseudo(el, estilo, r, '::before', salida);
 
       for (const hijo of el.childNodes) {
         if (hijo.nodeType === 3) texto(hijo, estilo, salida);
         else if (hijo.nodeType === 1) salida.push(...recorrer(hijo));
       }
+
+      // Y el ::after, encima de todo lo del bloque.
+      pseudo(el, estilo, r, '::after', salida);
     }
 
     if (!salida.length) return [];
@@ -543,7 +697,7 @@ export const aSvg = (ancho, alto) => {
     const atributos = [];
 
     const idRecorte = recorte(estilo, r);
-    const { rx, ry } = radioDe(estilo, r);
+    const e = radiosDe(estilo, r);
 
     // Chrome dice que una imagen recorta su propio desborde, lo cual en un SVG
     // no significa nada: recortarla a su propia caja no cambia el dibujo y
@@ -552,7 +706,7 @@ export const aSvg = (ancho, alto) => {
     // a mano o salen cuadradas.
     const reemplazado = tag === 'img' || tag === 'svg';
     const recortaDesborde = reemplazado
-      ? rx > 0 || ry > 0
+      ? !sinEsquinas(e)
       : estilo.overflow === 'hidden' || estilo.overflow === 'clip';
 
     if (idRecorte) {
@@ -560,8 +714,7 @@ export const aSvg = (ancho, alto) => {
     } else if (recortaDesborde && r.w > 0 && r.h > 0) {
       const id = nuevoId('caja');
       defs.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse">`
-        + `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" `
-        + `${esquinasDe(rx, ry)}/></clipPath>`);
+        + forma(r, e, '') + `</clipPath>`);
       atributos.push(`clip-path="url(#${id})"`);
     }
 
@@ -595,7 +748,8 @@ export const aSvg = (ancho, alto) => {
   // El fondo del propio <body> va primero y aparte: el recorrido arranca en
   // sus hijos, así que antes no se dibujaba nunca. Es el degradado de la
   // pieza entera.
-  fondo(raiz, getComputedStyle(raiz), rel(base), partes);
+  fondo(getComputedStyle(raiz), rel(base), partes);
+  pseudo(raiz, getComputedStyle(raiz), rel(base), '::before', partes);
 
   const grupos = [];
   for (const hijo of raiz.childNodes) {
@@ -610,6 +764,7 @@ export const aSvg = (ancho, alto) => {
   }
   grupos.sort((a, b) => a.z - b.z || a.orden - b.orden);
   for (const g of grupos) partes.push(...g.dibujo);
+  pseudo(raiz, getComputedStyle(raiz), rel(base), '::after', partes);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `
     + `width="${ancho}" height="${alto}" viewBox="0 0 ${ancho} ${alto}">\n`
