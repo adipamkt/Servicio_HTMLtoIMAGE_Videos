@@ -46,6 +46,14 @@ const PIEZA = `<!doctype html>
           background: #704EFD;
           -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 100%);
           mask-image: linear-gradient(to bottom, #000 30%, transparent 100%); }
+  .docente { position: absolute; left: 62px; top: 1120px; width: 420px;
+             border-left: 6px solid #fff; padding-left: 14px;
+             font-size: 34px; line-height: 42px; }
+  .gris { position: absolute; left: 820px; top: 1120px; width: 200px; height: 200px;
+          filter: grayscale(1) contrast(1.05); }
+  .contorno { position: absolute; left: 560px; top: 1120px; width: 200px; height: 200px;
+              filter: drop-shadow(9px 0 0 #fff) drop-shadow(-9px 0 0 #fff); }
+  .resalte { background: #FFC728; color: #091E42; box-shadow: 0 3px 10px rgba(18,32,59,.18); }
   .forma { position: absolute; left: 0; top: 1600px; width: 1080px; height: 320px;
            background: #091E42;
            clip-path: path('M0 0 L1080 0 L1080 320 L0 320 Z M0 0 Q540 170 1080 0 Z'); }
@@ -63,10 +71,13 @@ const PIEZA = `<!doctype html>
 <body>
   <div class="mancha"></div>
   <div class="pildora">Prueba del servicio</div>
-  <div class="titulo">Intervención en crisis: herramientas para el abordaje inicial del riesgo suicida</div>
+  <div class="titulo">Intervención en crisis: <span class="resalte">herramientas para el abordaje</span> inicial del riesgo suicida</div>
   <img src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><circle cx="110" cy="110" r="110" fill="#DFD5FF"/></svg>').toString('base64')}" alt="">
   <div class="marco"><img src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300"><rect width="640" height="300" fill="#1B6EF3"/></svg>').toString('base64')}" alt=""></div>
   <div class="fade"></div>
+  <div class="docente">PhD. Mg. Ps. John Sommers-Flanagan</div>
+  <img class="gris" src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#E0452B"/></svg>').toString('base64')}" alt="">
+  <img class="contorno" src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#1B6EF3"/></svg>').toString('base64')}" alt="">
   <div class="bloque"></div>
   <div class="cta">¡Cupos limitados! Inscríbete ahora</div>
   <div class="forma"></div>
@@ -152,6 +163,14 @@ for (const [que, ok] of Object.entries({
   'la mancha del fondo redonda': /rx="380"/.test(svg),
   'las fotos incrustadas': !/href="https?:/.test(svg),
   'el texto como texto': (svg.match(/<text\b/g) || []).length >= 4,
+  // La barra blanca que marca a cada docente: un borde de un lado solo, que
+  // dibujado como recuadro no se veía.
+  'la barra del docente': /<rect[^>]*width="6"[^>]*fill="rgb\(255, 255, 255\)"/.test(svg),
+  'el fondo en blanco y negro': /<feColorMatrix[^>]*type="saturate"[^>]*values="0"/.test(svg),
+  'el contorno blanco de la foto': /<feDropShadow[^>]*flood-color="rgb\(255, 255, 255\)"/.test(svg),
+  // Un resaltado que se parte en dos renglones son dos recuadros, no uno que
+  // los abarque.
+  'el resaltado por renglón': (svg.match(/fill="rgb\(255, 199, 40\)"/g) || []).length >= 2,
 })) comprobar(`el SVG trae ${que}`, ok);
 
 // --- 4. El segundo render, con el servicio ya caliente -------------------------

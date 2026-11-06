@@ -339,15 +339,137 @@ export const aSvg = (ancho, alto) => {
       }
     }
 
-    // El borde, si lo tiene.
-    const borde = parseFloat(estilo.borderTopWidth) || 0;
-    if (borde > 0 && pinta(estilo.borderTopColor)) {
+    // El borde. Casi nunca es el bloque entero: la plantilla marca los
+    // docentes y las viñetas con una barra de un solo lado, así que cada lado
+    // se mira por separado. Dibujarlos como un recuadro, que es lo que se
+    // hacía, dejaba esas barras afuera.
+    const lados = [
+      ['Top', r.x, r.y, r.w, null],
+      ['Right', null, r.y, null, r.h],
+      ['Bottom', r.x, null, r.w, null],
+      ['Left', r.x, r.y, null, r.h],
+    ].map(([lado, x, y, w, h]) => ({
+      lado, x, y, w, h,
+      grosor: parseFloat(estilo[`border${lado}Width`]) || 0,
+      color: estilo[`border${lado}Color`],
+      trazo: estilo[`border${lado}Style`],
+    })).filter(s => s.grosor > 0 && s.trazo !== 'none' && s.trazo !== 'hidden' && pinta(s.color));
+
+    if (!lados.length) return;
+
+    // Los cuatro lados iguales son un recuadro, y así respeta las esquinas
+    // redondeadas.
+    const todosIguales = lados.length === 4
+      && lados.every(s => s.grosor === lados[0].grosor && s.color === lados[0].color);
+
+    if (todosIguales) {
+      const g = lados[0].grosor;
       salida.push(
-        `<rect x="${n(r.x + borde / 2)}" y="${n(r.y + borde / 2)}" `
-        + `width="${n(Math.max(0, r.w - borde))}" height="${n(Math.max(0, r.h - borde))}" `
-        + esquinasDe(Math.max(0, rx - borde / 2), Math.max(0, ry - borde / 2))
-        + `fill="none" stroke="${estilo.borderTopColor}" stroke-width="${n(borde)}"/>`);
+        `<rect x="${n(r.x + g / 2)}" y="${n(r.y + g / 2)}" `
+        + `width="${n(Math.max(0, r.w - g))}" height="${n(Math.max(0, r.h - g))}" `
+        + esquinasDe(Math.max(0, rx - g / 2), Math.max(0, ry - g / 2))
+        + `fill="none" stroke="${lados[0].color}" stroke-width="${n(g)}"/>`);
+      return;
     }
+
+    for (const s of lados) {
+      const x = s.lado === 'Right' ? r.x + r.w - s.grosor : r.x;
+      const y = s.lado === 'Bottom' ? r.y + r.h - s.grosor : r.y;
+      const w = s.w === null ? s.grosor : s.w;
+      const h = s.h === null ? s.grosor : s.h;
+      salida.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" `
+        + `fill="${s.color}"/>`);
+    }
+  };
+
+  // Las funciones de una lista de CSS: "grayscale(1) contrast(1.05)" ->
+  // [['grayscale','1'], ['contrast','1.05']].
+  //
+  // Hay que contar los paréntesis en vez de buscar el primero que cierra,
+  // porque adentro puede haber otro: Chrome escribe los colores como
+  // `rgb(255, 255, 255)` y el contorno blanco de las fotos recortadas se
+  // perdía por eso.
+  const funciones = css => {
+    const salida = [];
+    const re = /([a-z-]+)\(/gi;
+    let m;
+    while ((m = re.exec(css))) {
+      let prof = 1, j = re.lastIndex;
+      while (j < css.length && prof > 0) {
+        if (css[j] === '(') prof++;
+        else if (css[j] === ')') prof--;
+        j++;
+      }
+      salida.push([m[1].toLowerCase(), css.slice(re.lastIndex, j - 1).trim()]);
+      re.lastIndex = j;
+    }
+    return salida;
+  };
+
+  // Una sombra de CSS -> el paso de filtro que la dibuja. Sirve igual para
+  // `drop-shadow(...)` y para `box-shadow`, que se escriben parecido: el
+  // color puede ir antes o después de los números.
+  const sombra = txt => {
+    const color = (txt.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i) || ['#000'])[0];
+    const [dx = 0, dy = 0, desenfoque = 0] =
+      (txt.replace(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i, '').match(/-?[\d.]+px/g) || []).map(parseFloat);
+    return `<feDropShadow dx="${n(dx)}" dy="${n(dy)}" stdDeviation="${n(desenfoque / 2)}" `
+      + `flood-color="${esc(color)}"/>`;
+  };
+
+  // Las sombras del bloque. Pueden venir varias separadas por coma; las de
+  // adentro (`inset`) no se pueden hacer así y se saltean.
+  const sombras = estilo => {
+    const css = String(estilo.boxShadow || 'none');
+    if (css === 'none') return [];
+    return porComas(css).filter(s => !/\binset\b/.test(s)).map(sombra);
+  };
+
+  // --- Filtros ----------------------------------------------------------------
+  //
+  // `filter: grayscale(1)` es lo que deja en blanco y negro la foto de fondo de
+  // casi todas las piezas. Sin esto salía a todo color.
+  const filtro = estilo => {
+    const css = String(estilo.filter || 'none');
+    const pasos = [];
+    for (const [fn, arg] of (css === 'none' ? [] : funciones(css))) {
+      // Los porcentajes y los números dicen lo mismo: 35% es 0,35.
+      const num = (txt, porDefecto) => {
+        if (!txt) return porDefecto;
+        return txt.endsWith('%') ? parseFloat(txt) / 100 : parseFloat(txt);
+      };
+      // Un cambio lineal de cada canal: brillo mueve la pendiente, contraste
+      // la mueve y recentra.
+      const lineal = (pendiente, corte) => `<feComponentTransfer>`
+        + ['R', 'G', 'B'].map(c =>
+          `<feFunc${c} type="linear" slope="${n(pendiente)}" intercept="${n(corte)}"/>`).join('')
+        + `</feComponentTransfer>`;
+
+      if (fn === 'grayscale') pasos.push(`<feColorMatrix type="saturate" values="${n(1 - num(arg, 1))}"/>`);
+      else if (fn === 'saturate') pasos.push(`<feColorMatrix type="saturate" values="${n(num(arg, 1))}"/>`);
+      else if (fn === 'brightness') pasos.push(lineal(num(arg, 1), 0));
+      else if (fn === 'contrast') { const k = num(arg, 1); pasos.push(lineal(k, (1 - k) / 2)); }
+      else if (fn === 'opacity') pasos.push(`<feComponentTransfer><feFuncA type="linear" slope="${n(num(arg, 1))}" intercept="0"/></feComponentTransfer>`);
+      else if (fn === 'invert') pasos.push(`<feComponentTransfer>`
+        + ['R', 'G', 'B'].map(c => `<feFunc${c} type="table" tableValues="${n(num(arg, 1))} ${n(1 - num(arg, 1))}"/>`).join('')
+        + `</feComponentTransfer>`);
+      else if (fn === 'blur') pasos.push(`<feGaussianBlur stdDeviation="${n(parseFloat(arg) || 0)}"/>`);
+      else if (fn === 'drop-shadow') pasos.push(sombra(arg));
+    }
+
+    // La sombra del bloque es otra propiedad, pero en SVG se dibuja con lo
+    // mismo. El desparramo (el cuarto número) no tiene equivalente y se
+    // ignora: son sombras de adorno, de uno o dos píxeles.
+    for (const s of sombras(estilo)) pasos.unshift(s);
+
+    if (!pasos.length) return null;
+
+    const id = nuevoId('filtro');
+    // La zona del filtro se agranda: una sombra que se sale del bloque se
+    // cortaría con el recuadro de por defecto.
+    defs.push(`<filter id="${id}" x="-25%" y="-25%" width="150%" height="150%" `
+      + `color-interpolation-filters="sRGB">${pasos.join('')}</filter>`);
+    return id;
   };
 
   // --- Recorrido --------------------------------------------------------------
@@ -391,7 +513,13 @@ export const aSvg = (ancho, alto) => {
           + `preserveAspectRatio="${ajuste}" href="${esc(src)}"/>`);
       }
     } else {
-      fondo(el, estilo, r, salida);
+      // Un texto en línea con fondo —las frases resaltadas— se parte en
+      // varios renglones, y cada uno tiene su propio recuadro. Pintar la caja
+      // que los abarca a todos taparía el hueco del final de cada renglón.
+      const cajas = el.getClientRects();
+      if (cajas.length > 1) for (const c of cajas) fondo(el, estilo, rel(c), salida);
+      else fondo(el, estilo, r, salida);
+
       for (const hijo of el.childNodes) {
         if (hijo.nodeType === 3) texto(hijo, estilo, salida);
         else if (hijo.nodeType === 1) salida.push(...recorrer(hijo));
@@ -433,6 +561,16 @@ export const aSvg = (ancho, alto) => {
 
     const idMascara = desvanecido(estilo, r);
     if (idMascara) atributos.push(`mask="url(#${idMascara})"`);
+
+    const idFiltro = filtro(estilo);
+    if (idFiltro) atributos.push(`filter="url(#${idFiltro})"`);
+
+    // El modo de fusión: la plantilla apoya el logo de ADIPA con `multiply`
+    // para que su fondo blanco desaparezca. Va como estilo y no como atributo
+    // porque en SVG es una propiedad de CSS.
+    const fusion = estilo.mixBlendMode;
+    if (fusion && fusion !== 'normal') atributos.push(`style="mix-blend-mode:${fusion}"`);
+
     if (opacidad < 1) atributos.push(`opacity="${opacidad}"`);
 
     return atributos.length
