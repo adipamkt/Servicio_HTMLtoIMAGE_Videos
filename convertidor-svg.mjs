@@ -28,7 +28,13 @@ export const aSvg = (ancho, alto) => {
   let cuenta = 0;
   const nuevoId = p => `${p}-${++cuenta}`;
 
-  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Las comillas también: el nombre de una tipografía con espacios viene
+  // entrecomillado desde el navegador —"Times New Roman"— y metido tal cual
+  // dentro de un atributo rompe el archivo. Illustrator no abre un SVG que no
+  // sea XML válido.
+  const esc = s => String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
   const n = v => Math.round(v * 100) / 100;
 
   // Un color CSS que no pinta nada: transparente o alfa 0.

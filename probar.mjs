@@ -54,6 +54,10 @@ const PIEZA = `<!doctype html>
   .contorno { position: absolute; left: 560px; top: 1120px; width: 200px; height: 200px;
               filter: drop-shadow(9px 0 0 #fff) drop-shadow(-9px 0 0 #fff); }
   .resalte { background: #FFC728; color: #091E42; box-shadow: 0 3px 10px rgba(18,32,59,.18); }
+  /* Una tipografía con espacios en el nombre: el navegador la entrecomilla y
+     dentro de un atributo rompe el XML si no se escapa. */
+  .serif { position: absolute; left: 62px; top: 1360px; font-family: "Times New Roman", serif;
+           font-size: 30px; color: #091E42; }
   .forma { position: absolute; left: 0; top: 1600px; width: 1080px; height: 320px;
            background: #091E42;
            clip-path: path('M0 0 L1080 0 L1080 320 L0 320 Z M0 0 Q540 170 1080 0 Z'); }
@@ -76,6 +80,7 @@ const PIEZA = `<!doctype html>
   <div class="marco"><img src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300"><rect width="640" height="300" fill="#1B6EF3"/></svg>').toString('base64')}" alt=""></div>
   <div class="fade"></div>
   <div class="docente">PhD. Mg. Ps. John Sommers-Flanagan</div>
+  <div class="serif">Nombre con tipografía de dos palabras</div>
   <img class="gris" src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#E0452B"/></svg>').toString('base64')}" alt="">
   <img class="contorno" src="data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#1B6EF3"/></svg>').toString('base64')}" alt="">
   <div class="bloque"></div>
@@ -171,6 +176,10 @@ for (const [que, ok] of Object.entries({
   // Un resaltado que se parte en dos renglones son dos recuadros, no uno que
   // los abarque.
   'el resaltado por renglón': (svg.match(/fill="rgb\(255, 199, 40\)"/g) || []).length >= 2,
+  // Una comilla sin escapar adentro de un atributo rompe el XML, y un SVG
+  // roto no lo abre nadie.
+  'la tipografía de dos palabras escapada':
+    svg.includes('&quot;Times New Roman&quot;') && !svg.includes('=""Times'),
 })) comprobar(`el SVG trae ${que}`, ok);
 
 // --- 4. El segundo render, con el servicio ya caliente -------------------------
