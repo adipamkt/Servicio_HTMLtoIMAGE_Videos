@@ -187,12 +187,16 @@ for (const [que, ok] of Object.entries({
   // Un SVG metido adentro de otro tampoco lo dibuja Illustrator: las fotos de
   // la pieza de prueba son SVG y tienen que haber salido convertidas a PNG.
   'sin imágenes SVG adentro': !svg.includes('data:image/svg+xml'),
+  // Nada de SVG 2 en la salida: Illustrator lee 1.1 y lo que no entiende no
+  // lo dibuja, sin avisar. `feDropShadow` se lleva el contorno blanco de las
+  // fotos recortadas; va escrito a mano con primitivas viejas.
+  'sin primitivas de SVG 2': !/feDropShadow|<feDropShadow/.test(svg) && /<feMerge\b/.test(svg),
   'el texto como texto': (svg.match(/<text\b/g) || []).length >= 4,
   // La barra blanca que marca a cada docente: un borde de un lado solo, que
   // dibujado como recuadro no se veía.
   'la barra del docente': /<rect[^>]*width="6"[^>]*fill="rgb\(255, 255, 255\)"/.test(svg),
   'el fondo en blanco y negro': /<feColorMatrix[^>]*type="saturate"[^>]*values="0"/.test(svg),
-  'el contorno blanco de la foto': /<feDropShadow[^>]*flood-color="rgb\(255, 255, 255\)"/.test(svg),
+  'el contorno blanco de la foto': /<feFlood[^>]*flood-color="rgb\(255, 255, 255\)"/.test(svg),
   // Un resaltado que se parte en dos renglones son dos recuadros, no uno que
   // los abarque.
   'el resaltado por renglón': (svg.match(/fill="rgb\(255, 199, 40\)"/g) || []).length >= 2,
@@ -210,6 +214,36 @@ for (const [que, ok] of Object.entries({
   // El velo del CSS, que no existe como etiqueta en la página.
   'el velo de los pseudo-elementos': (svg.match(/<linearGradient\b/g) || []).length >= 3,
 })) comprobar(`el SVG trae ${que}`, ok);
+
+// --- 3c. Que un lector estricto también lo dibuje -----------------------------
+//
+// Hasta acá el SVG se comprobaba leyéndolo y dibujándolo con Chrome, que es
+// justo el motor que no se parece al de diseño: es un navegador y entiende
+// SVG 2. Illustrator lee SVG 1.1 y lo que no entiende no lo dibuja, callado.
+//
+// librsvg es un lector SVG 1.1 que no es un navegador, así que se parece
+// mucho más. Si lo que sale acá no se parece a la imagen, algo del archivo no
+// va a llegar a diseño. Pasó con el contorno blanco de las fotos recortadas:
+// perfecto en Chrome, invisible en todo lo demás.
+try {
+  const sharp = (await import('sharp')).default;
+  const imagen = Buffer.from(await (await fetch(cuerpo.url)).arrayBuffer());
+  const estricto = await sharp(Buffer.from(svg, 'utf8')).resize(1080, 1920).png().toBuffer();
+
+  const leer = async b => sharp(b).resize(300).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const [A, B] = await Promise.all([leer(imagen), leer(estricto)]);
+  let suma = 0;
+  const N = Math.min(A.data.length, B.data.length);
+  for (let i = 0; i < N; i++) suma += Math.abs(A.data[i] - B.data[i]);
+  const dif = suma / N;
+
+  // El margen es ancho a propósito: en una máquina sin Poppins el texto cae
+  // en otra letra y eso solo ya da unos 10. Lo que se busca es el derrumbe
+  // —fotos que no salen, formas que no se dibujan—, que da mucho más.
+  comprobar('lo dibuja igual un lector SVG 1.1', dif < 25, `diferencia ${dif.toFixed(1)} / 255`);
+} catch (e) {
+  marca('lo dibuja igual un lector SVG 1.1', true, `se saltea: ${e.message.slice(0, 40)}`);
+}
 
 // --- 4. El segundo render, con el servicio ya caliente -------------------------
 const t1 = Date.now();

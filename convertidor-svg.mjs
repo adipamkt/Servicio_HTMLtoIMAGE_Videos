@@ -516,12 +516,13 @@ export const aSvg = (ancho, alto) => {
   // Una sombra de CSS -> el paso de filtro que la dibuja. Sirve igual para
   // `drop-shadow(...)` y para `box-shadow`, que se escriben parecido: el
   // color puede ir antes o después de los números.
-  const sombra = txt => {
-    const color = (txt.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i) || ['#000'])[0];
+  const leerSombra = txt => {
+    const color = (txt.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i) || ['rgb(0, 0, 0)'])[0];
     const [dx = 0, dy = 0, desenfoque = 0] =
       (txt.replace(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i, '').match(/-?[\d.]+px/g) || []).map(parseFloat);
-    return `<feDropShadow dx="${n(dx)}" dy="${n(dy)}" stdDeviation="${n(desenfoque / 2)}" `
-      + `flood-color="${esc(color)}"/>`;
+    // El color y su transparencia van por separado: `flood-color` en SVG 1.1
+    // es un color a secas, sin alfa.
+    return { color: color.replace(/^rgba\(([^)]*),[^,)]*\)$/, 'rgb($1)'), alfa: alfaDe(color), dx, dy, desenfoque };
   };
 
   // Las sombras del bloque. Pueden venir varias separadas por coma; las de
@@ -529,16 +530,50 @@ export const aSvg = (ancho, alto) => {
   const sombras = estilo => {
     const css = String(estilo.boxShadow || 'none');
     if (css === 'none') return [];
-    return porComas(css).filter(s => !/\binset\b/.test(s)).map(sombra);
+    return porComas(css).filter(s => !/\binset\b/.test(s)).map(leerSombra);
   };
 
   // --- Filtros ----------------------------------------------------------------
   //
   // `filter: grayscale(1)` es lo que deja en blanco y negro la foto de fondo de
   // casi todas las piezas. Sin esto salía a todo color.
+  // Todo se escribe con primitivas de SVG 1.1, encadenadas a mano con
+  // `in`/`result`. La tentación era usar `feDropShadow`, que hace la sombra
+  // de un saque, pero es de SVG 2: Illustrator lo ignora y el contorno blanco
+  // de las fotos recortadas desaparecía. En el navegador se veía bien, claro.
   const filtro = estilo => {
     const css = String(estilo.filter || 'none');
     const pasos = [];
+    let entrada = 'SourceGraphic';
+    let cuentaPaso = 0;
+    const nombre = () => `p${nuevoId('').slice(1)}-${++cuentaPaso}`;
+
+    // Un paso que toma lo que vino y deja su resultado como la nueva entrada.
+    const encadenar = (abrir, dentro = '', cerrar = '') => {
+      const r = nombre();
+      pasos.push(`${abrir.replace('%IN%', entrada)} result="${r}">${dentro}${cerrar}`);
+      entrada = r;
+    };
+    const simple = xml => {
+      const r = nombre();
+      pasos.push(xml.replace('%IN%', entrada).replace('%OUT%', r));
+      entrada = r;
+    };
+
+    // La sombra, escrita a mano: se desenfoca lo que hay, se corre, se pinta
+    // del color pedido y se pone debajo del original.
+    const dibujarSombra = ({ color, alfa, dx, dy, desenfoque }) => {
+      const origen = entrada;
+      const a = nombre(), b = nombre(), c = nombre(), d = nombre(), e = nombre();
+      pasos.push(
+        `<feGaussianBlur in="${origen}" stdDeviation="${n(desenfoque / 2)}" result="${a}"/>`,
+        `<feOffset in="${a}" dx="${n(dx)}" dy="${n(dy)}" result="${b}"/>`,
+        `<feFlood flood-color="${esc(color)}"${alfa < 1 ? ` flood-opacity="${n(alfa)}"` : ''} result="${c}"/>`,
+        `<feComposite in="${c}" in2="${b}" operator="in" result="${d}"/>`,
+        `<feMerge result="${e}"><feMergeNode in="${d}"/><feMergeNode in="${origen}"/></feMerge>`);
+      entrada = e;
+    };
+
     for (const [fn, arg] of (css === 'none' ? [] : funciones(css))) {
       // Los porcentajes y los números dicen lo mismo: 35% es 0,35.
       const num = (txt, porDefecto) => {
@@ -547,27 +582,29 @@ export const aSvg = (ancho, alto) => {
       };
       // Un cambio lineal de cada canal: brillo mueve la pendiente, contraste
       // la mueve y recentra.
-      const lineal = (pendiente, corte) => `<feComponentTransfer>`
-        + ['R', 'G', 'B'].map(c =>
-          `<feFunc${c} type="linear" slope="${n(pendiente)}" intercept="${n(corte)}"/>`).join('')
-        + `</feComponentTransfer>`;
+      const lineal = (pendiente, corte) => encadenar(
+        `<feComponentTransfer in="%IN%"`,
+        ['R', 'G', 'B'].map(c =>
+          `<feFunc${c} type="linear" slope="${n(pendiente)}" intercept="${n(corte)}"/>`).join(''),
+        `</feComponentTransfer>`);
 
-      if (fn === 'grayscale') pasos.push(`<feColorMatrix type="saturate" values="${n(1 - num(arg, 1))}"/>`);
-      else if (fn === 'saturate') pasos.push(`<feColorMatrix type="saturate" values="${n(num(arg, 1))}"/>`);
-      else if (fn === 'brightness') pasos.push(lineal(num(arg, 1), 0));
-      else if (fn === 'contrast') { const k = num(arg, 1); pasos.push(lineal(k, (1 - k) / 2)); }
-      else if (fn === 'opacity') pasos.push(`<feComponentTransfer><feFuncA type="linear" slope="${n(num(arg, 1))}" intercept="0"/></feComponentTransfer>`);
-      else if (fn === 'invert') pasos.push(`<feComponentTransfer>`
-        + ['R', 'G', 'B'].map(c => `<feFunc${c} type="table" tableValues="${n(num(arg, 1))} ${n(1 - num(arg, 1))}"/>`).join('')
-        + `</feComponentTransfer>`);
-      else if (fn === 'blur') pasos.push(`<feGaussianBlur stdDeviation="${n(parseFloat(arg) || 0)}"/>`);
-      else if (fn === 'drop-shadow') pasos.push(sombra(arg));
+      if (fn === 'grayscale') simple(`<feColorMatrix in="%IN%" type="saturate" values="${n(1 - num(arg, 1))}" result="%OUT%"/>`);
+      else if (fn === 'saturate') simple(`<feColorMatrix in="%IN%" type="saturate" values="${n(num(arg, 1))}" result="%OUT%"/>`);
+      else if (fn === 'brightness') lineal(num(arg, 1), 0);
+      else if (fn === 'contrast') { const k = num(arg, 1); lineal(k, (1 - k) / 2); }
+      else if (fn === 'opacity') encadenar(`<feComponentTransfer in="%IN%"`,
+        `<feFuncA type="linear" slope="${n(num(arg, 1))}" intercept="0"/>`, `</feComponentTransfer>`);
+      else if (fn === 'invert') encadenar(`<feComponentTransfer in="%IN%"`,
+        ['R', 'G', 'B'].map(c => `<feFunc${c} type="table" tableValues="${n(num(arg, 1))} ${n(1 - num(arg, 1))}"/>`).join(''),
+        `</feComponentTransfer>`);
+      else if (fn === 'blur') simple(`<feGaussianBlur in="%IN%" stdDeviation="${n(parseFloat(arg) || 0)}" result="%OUT%"/>`);
+      else if (fn === 'drop-shadow') dibujarSombra(leerSombra(arg));
     }
 
-    // La sombra del bloque es otra propiedad, pero en SVG se dibuja con lo
-    // mismo. El desparramo (el cuarto número) no tiene equivalente y se
-    // ignora: son sombras de adorno, de uno o dos píxeles.
-    for (const s of sombras(estilo)) pasos.unshift(s);
+    // La sombra del bloque es otra propiedad, pero se dibuja con lo mismo. El
+    // desparramo (el cuarto número) no tiene equivalente y se ignora: son
+    // sombras de adorno, de uno o dos píxeles.
+    for (const s of sombras(estilo)) dibujarSombra(s);
 
     if (!pasos.length) return null;
 
