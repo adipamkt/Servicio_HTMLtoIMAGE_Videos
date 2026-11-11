@@ -8,8 +8,39 @@
 // necesita esto, y cargar el catálogo le haría leer el export entero del
 // workflow en cada arranque.
 //
+import sharp from 'sharp';
 import { conPagina } from './navegador.mjs';
 import { aSvg } from './convertidor-svg.mjs';
+
+// Una imagen que a su vez es un SVG no se puede dejar incrustada: Illustrator
+// no abre un SVG metido adentro de otro, y la foto desaparece. Se pasa a PNG
+// al doble de la medida con la que se ve, para que aguante un acercamiento.
+//
+// Hoy las plantillas mandan todo en PNG, así que esto casi nunca actúa. Está
+// por si mañana alguien incrusta un logo vectorial.
+async function aplanarSvgIncrustados(svg) {
+  const encontrados = [...svg.matchAll(
+    /<image[^>]*?width="([\d.]+)"[^>]*?height="([\d.]+)"[^>]*?xlink:href="(data:image\/svg\+xml[^"]*)"/g)];
+  if (!encontrados.length) return svg;
+
+  let salida = svg;
+  for (const [, ancho, alto, uri] of encontrados) {
+    try {
+      const coma = uri.indexOf(',');
+      const datos = uri.slice(coma + 1);
+      const bytes = /;base64/.test(uri.slice(0, coma))
+        ? Buffer.from(datos, 'base64')
+        : Buffer.from(decodeURIComponent(datos), 'utf8');
+      const png = await sharp(bytes, { density: 192 })
+        .resize({ width: Math.max(1, Math.round(Number(ancho) * 2)), fit: 'inside' })
+        .png().toBuffer();
+      salida = salida.split(uri).join(`data:image/png;base64,${png.toString('base64')}`);
+    } catch {
+      // Si no se puede convertir, se deja como está: mejor eso que nada.
+    }
+  }
+  return salida;
+}
 
 // Un SVG tiene que valerse por sí mismo: quien lo abre en Illustrator puede
 // no tener internet, y Illustrator no sale a buscar imágenes de todos modos.
@@ -19,7 +50,7 @@ import { aSvg } from './convertidor-svg.mjs';
 // no tenga nada que hacer.
 async function incrustarImagenes(svg) {
   const enlaces = [...new Set(
-    [...svg.matchAll(/href="(https?:\/\/[^"]+)"/g)].map(m => m[1]))];
+    [...svg.matchAll(/xlink:href="(https?:\/\/[^"]+)"/g)].map(m => m[1]))];
   if (!enlaces.length) return svg;
 
   const bajadas = await Promise.all(enlaces.map(async url => {
@@ -39,7 +70,7 @@ async function incrustarImagenes(svg) {
   let salida = svg;
   enlaces.forEach((url, i) => {
     if (!bajadas[i]) return;
-    salida = salida.split(`href="${url}"`).join(`href="${bajadas[i]}"`);
+    salida = salida.split(`xlink:href="${url}"`).join(`xlink:href="${bajadas[i]}"`);
   });
   return salida;
 }
@@ -53,6 +84,6 @@ export async function svgDesdeHtml(html, ancho, alto) {
     // La función viaja a la página y se ejecuta allá, donde está el dibujo.
     return pagina.evaluate(aSvg, ancho, alto);
   });
-  const completo = await incrustarImagenes(svg);
+  const completo = await aplanarSvgIncrustados(await incrustarImagenes(svg));
   return Buffer.from('<?xml version="1.0" encoding="UTF-8"?>\n' + completo, 'utf8');
 }

@@ -180,6 +180,13 @@ for (const [que, ok] of Object.entries({
   'la foto redonda redonda': /<clipPath[^>]*>\s*<rect[^>]*rx="110"/.test(svg),
   'la mancha del fondo redonda': /rx="380"/.test(svg),
   'las fotos incrustadas': !/href="https?:/.test(svg),
+  // Illustrator lee SVG 1.1, donde las imágenes van con `xlink:href`. Con el
+  // `href` a secas, que es SVG 2, el archivo se ve bien en Chrome y llega sin
+  // ninguna foto al programa de diseño.
+  'las fotos con xlink:href': /xlink:href="data:/.test(svg) && !/\shref="/.test(svg),
+  // Un SVG metido adentro de otro tampoco lo dibuja Illustrator: las fotos de
+  // la pieza de prueba son SVG y tienen que haber salido convertidas a PNG.
+  'sin imágenes SVG adentro': !svg.includes('data:image/svg+xml'),
   'el texto como texto': (svg.match(/<text\b/g) || []).length >= 4,
   // La barra blanca que marca a cada docente: un borde de un lado solo, que
   // dibujado como recuadro no se veía.

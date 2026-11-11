@@ -434,12 +434,17 @@ export const aSvg = (ancho, alto) => {
         salida.push(forma(r, e, `fill="${g.pintura}"`));
       } else {
         // Una foto puesta como fondo: se incrusta igual que un <img>.
+        //
+        // Va con `xlink:href` y no con el `href` a secas: el `href` solo es
+        // SVG 2, y el lector de Illustrator es SVG 1.1. Chrome entiende los
+        // dos, así que el archivo se veía bien en el navegador y llegaba sin
+        // ninguna foto al programa de diseño, que es donde importa.
         const u = img.match(/^url\(["']?([^"')]+)["']?\)$/);
         if (u) {
           const ajuste = estilo.backgroundSize === 'contain' ? 'xMidYMid meet'
             : estilo.backgroundSize === 'cover' ? 'xMidYMid slice' : 'none';
           salida.push(`<image x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" `
-            + `preserveAspectRatio="${ajuste}" href="${esc(u[1])}"/>`);
+            + `preserveAspectRatio="${ajuste}" xlink:href="${esc(u[1])}"/>`);
         }
       }
     }
@@ -664,7 +669,7 @@ export const aSvg = (ancho, alto) => {
           : estilo.objectFit === 'contain' ? `${alineado} meet` : 'none';
         salida.push(
           `<image x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" `
-          + `preserveAspectRatio="${ajuste}" href="${esc(src)}"/>`);
+          + `preserveAspectRatio="${ajuste}" xlink:href="${esc(src)}"/>`);
       }
     } else {
       // Un texto en línea con fondo —las frases resaltadas— se parte en
